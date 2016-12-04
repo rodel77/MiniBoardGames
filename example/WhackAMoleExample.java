@@ -1,7 +1,6 @@
 package mx.com.rodel.games.defaultgames;
 
 import java.util.ArrayList;
-
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +14,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import mx.com.rodel.games.Game;
 import mx.com.rodel.utils.Helper;
@@ -67,14 +67,21 @@ public class WhackAMole extends Game{
 	}
 	
 	//Handle click event
+	@SuppressWarnings("deprecation")
 	@Override
 	public void onPlayerClickOnGUI(InventoryClickEvent e) {
+		e.setCancelled(true);
+		e.setCursor(new ItemStack(Material.AIR));
 		//Check if is a game skull
-		if(e.getCurrentItem()!=null && e.getCurrentItem().getType()==Material.SKULL_ITEM && e.getCurrentItem().getItemMeta().getDisplayName().equals(getStringNode("smash")) && slots.contains(e.getSlot())){
+		if(e.getCurrentItem()!=null && e.getCurrentItem().hasItemMeta() && e.getCurrentItem().getItemMeta().hasDisplayName() && e.getCurrentItem().getItemMeta().getDisplayName().equals(getStringNode("smash")) && 
+				slots.contains(e.getSlot())){
 			//Increment points
-			points += 5;
+			points += e.getCurrentItem().getAmount();
 			//Play the sound according the skull
-			switch (e.getCurrentItem().getDurability()) {
+			if(e.getCurrentItem().getType()==Material.COOKIE){
+				SoundHelper.ENTITY_ARROW_HIT_PLAYER.play((Player) e.getWhoClicked(), 1, 1);
+			}else if(e.getCurrentItem().getType()==Material.SKULL_ITEM){
+				switch (e.getCurrentItem().getDurability()) {
 				case 0:
 					SoundHelper.ENTITY_SKELETON_DEATH.play((Player) e.getWhoClicked(), 1, 1);
 					break;
@@ -91,12 +98,12 @@ public class WhackAMole extends Game{
 					SoundHelper.ENTITY_CREEPER_DEATH.play((Player) e.getWhoClicked(), 1, 1);
 					break;
 			}
+			}
 			removeItem(player, e.getSlot());
 			//Increment local stat for send to DB when the game end
 			incrementStat(player, "mobsSmashed", 1);
-			incrementStat(player, "coins", 5);
+			incrementStat(player, "coins", e.getCurrentItem().getAmount());
 		}
-		e.setCancelled(true);
 	}
 	
 	//Handle loop
@@ -123,12 +130,21 @@ public class WhackAMole extends Game{
 			
 			int[] r = new int[] {0,1,2,4};
 			
+			int points = new Random().nextInt(5);
+			
+			if(new Random().nextInt(4)==0){
+				points+=new Random().nextInt(3);
+			}
+			
 			boolean halloween = Helper.getMonth()==9;
-			if(halloween){
+			boolean xmas = Helper.getMonth()==11;
+			if(xmas){
+				sendToAllClients(createItem(Material.COOKIE, 0, points, getStringNode("smash")), slots.get(new Random().nextInt(slots.size())));
+			}else if(halloween){
 				//This is sooooo spoky...
-				sendToAllClients(Helper.headizer("MHF_Pumpkin", createItem(Material.SKULL_ITEM, 3, 1, getStringNode("smash"))), slots.get(new Random().nextInt(slots.size())));
+				sendToAllClients(Helper.headizer("MHF_Pumpkin", createItem(Material.SKULL_ITEM, 3, points, getStringNode("smash"))), slots.get(new Random().nextInt(slots.size())));
 			}else{
-				sendToAllClients(createItem(Material.SKULL_ITEM, r[new Random().nextInt(r.length)], 1, getStringNode("smash")), slots.get(new Random().nextInt(slots.size())));
+				sendToAllClients(createItem(Material.SKULL_ITEM, r[new Random().nextInt(r.length)], points, getStringNode("smash")), slots.get(new Random().nextInt(slots.size())));
 			}
 			
 		}
@@ -177,8 +193,8 @@ public class WhackAMole extends Game{
 
 	//Game icon in game list
 	@Override
-	public Material getIcon() {
-		return Material.DIAMOND_PICKAXE;
+	public ItemStack getItemIcon() {
+		return new ItemStack(Material.DIAMOND_PICKAXE);
 	}
 
 	//Game color for GUI, this can be changed in configuration "displayName"
@@ -210,5 +226,10 @@ public class WhackAMole extends Game{
 		stats.put("mobsSmashed", "INT(10)");
 		stats.put("coins", "INT(10)");
 		return stats;
+	}
+	
+	@Override
+	public String getGameInstructions() {
+		return "Smash the most possible skulls#in 60 seconds";
 	}
 }
